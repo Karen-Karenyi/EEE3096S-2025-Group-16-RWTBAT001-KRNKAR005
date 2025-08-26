@@ -35,139 +35,87 @@ ASM_Main:
 @ TODO: Add code, labels and logic for button checks and LED patterns
 
 main_loop:
-    @ Run Default Pattern
-    STR R2, [R1, #0x14]      @ Offset 0x14 is ODR - write R2 to LEDs
-                             @ Display current pattern (in R2) on LEDs (GPIOB_ODR)
+    @ Read button states from GPIOA_IDR (offset 0x10)
+    LDR R0, GPIOA_BASE      @ Load GPIOA base address into R0
+    LDR R3, [R0, #0x10]    @ Read GPIOA_IDR into R3 
+    @0x10 is the offset to the Input Data Register (IDR)
 
-    @ Check which delay to use based on current mode
-    @ R7 will be our temporary delay counter holder
-    LDR R7, =delay_mode      @ Load address of delay mode flag
-    LDR R8, [R7]             @ Load delay mode value (0 = long, 1 = short)
-    CMP R8, #1
-    BNE use_long_delay
-
-use_short_delay:
-    LDR R7, SHORT_DELAY_CNT  @ Load short delay value
-    B delay_start
-
-use_long_delay:
-    LDR R7, LONG_DELAY_CNT   @ Load long delay value
-
-delay_start:
-    @ Delay loop
-delay_loop:
-    SUBS R7, R7, #1          @ Decrement delay counter
-    BNE delay_loop           @ Loop until counter reaches 0
-
-    @ Increment the pattern based on current increment mode
-    @ R6 will be our temporary increment value holder
-    LDR R6, =increment_mode  @ Load address of increment mode
-    LDR R8, [R6]             @ Load increment value (1 or 2)
-    ADD R2, R2, R8           @ Add increment to pattern
-
-    @ --- PART 2: Check Buttons ---
-    LDR R0, GPIOA_BASE
-    LDR R3, [R0, #0x10]      @ Read GPIOA_IDR into R3 (buttons state)
-
-    @ Check SW0 and SW1 together first (bits 0 and 1)
-    MOVS R4, #0b00000011     @ Mask for SW0 and SW1
-    ANDS R5, R3, R4          @ Isolate SW0 and SW1 bits
-    CMP R5, #0b00000001      @ Is only SW0 pressed? (SW0=0, SW1=1)
-    BEQ mode_two
-    CMP R5, #0b00000010      @ Is only SW1 pressed? (SW0=1, SW1=0)
-    BEQ mode_three
-    CMP R5, #0b00000000      @ Are both SW0 and SW1 pressed? (SW0=0, SW1=0)
-    BEQ mode_four
-
-    @ Check SW2 (bit 2)
-    MOVS R4, #0b00000100     @ Mask for SW2
+    @ Check if SW2 is pressed
+    MOVS R4, #0b00000100    @ Mask for SW2 
     TST R3, R4
-    BEQ mode_five            @ If pressed (bit=0), branch
+    BEQ SW2_pressed         @ If pressed, branch to SW2_pressed    
 
-    @ Check SW3 (bit 3)
-    MOVS R4, #0b00001000     @ Mask for SW3
+    @ Check if SW3 is pressed
+    MOVS R4, #0b00001000    @ Mask for SW3
     TST R3, R4
-    BEQ mode_freeze          @ If pressed (bit=0), branch
+    BEQ sw3_pressed         @ If pressed, branch to SW3_pressed
 
-    @ Default Mode 1: No buttons pressed
-    B mode_one
+    @ If neither SW2 nor SW3 pressed, go to default pattern
+    B default_pattern
 
-mode_one:
-    @ Set increment to 1, delay to long
-    LDR R6, =increment_mode
-    MOV R8, #1
-    STR R8, [R6]
-    LDR R7, =delay_mode
-    MOV R8, #0
-    STR R8, [R7]
-    B main_loop
+SW2_pressed:
+    MOVS R2, #0xAA          @ Set pattern to 0xAA (10101010)
+    STR R2, [R1, #0x14]     @ Update LEDs immediately. Store In Register Format = STR Rt, [Rn, #offset]
+    @0x14 is the exact memory offset from the GPIO base address to reach the Output Data Register (ODR)
 
-mode_two:
-    @ Set increment to 2, delay to long
-    LDR R6, =increment_mode
-    MOV R8, #2
-    STR R8, [R6]
-    LDR R7, =delay_mode
-    MOV R8, #0
-    STR R8, [R7]
-    B main_loop
-
-mode_three:
-    @ Set increment to 1, delay to short
-    LDR R6, =increment_mode
-    MOV R8, #1
-    STR R8, [R6]
-    LDR R7, =delay_mode
-    MOV R8, #1
-    STR R8, [R7]
-    B main_loop
-
-mode_four:
-    @ Set increment to 2, delay to short
-    LDR R6, =increment_mode
-    MOV R8, #2
-    STR R8, [R6]
-    LDR R7, =delay_mode
-    MOV R8, #1
-    STR R8, [R7]
-    B main_loop
-
-mode_five:
-    @ Force pattern to 0xAA and display it
-    MOV R2, #0xAA
-    STR R2, [R1, #0x14]     @ Update LEDs immediately
-
-    @ Wait in loop until SW2 is released
-mode_five_loop:
+    @ if SW2 is still pressed-> stay in loop
+SW2_loop:
     LDR R3, [R0, #0x10]     @ Read GPIOA_IDR again
     MOVS R4, #0b00000100    @ Mask for SW2
     TST R3, R4
-    BEQ mode_five_loop      @ Loop if button is still pressed
+    BEQ SW2_loop            @ Loop if button is still pressed
 
-    B main_loop             @ Return to main loop when released
+    B delay_selection     @ When released, continue with delay
 
-mode_freeze:
-    @ Keep displaying the current pattern while frozen
-    STR R2, [R1, #0x14]     @ Keep LEDs on
+sw3_pressed:
+    STR R2, [R1, #0x14]     @ Keep displaying current pattern
 
-    @ Wait in loop until SW3 is released
-mode_freeze_loop:
+    @ if SW3 is still pressed-> stay in loop
+sw3_loop:
     LDR R3, [R0, #0x10]     @ Read GPIOA_IDR again
     MOVS R4, #0b00001000    @ Mask for SW3
     TST R3, R4
-    BEQ mode_freeze_loop    @ Loop if button is still pressed
+    BEQ sw3_loop            @ Loop if button is still pressed
 
-    B main_loop             @ Return to main loop when released
-@ Data section for mode variables
-.data
-.align
-increment_mode: .word 1     @ Start with increment by 1
-delay_mode:     .word 0     @ Start with long delay
+    B delay_selection     @ When released, continue with delay
 
+default_pattern:
+    @ Check if SW0 is pressed or not
+    MOVS R4, #0b00000001    @ Mask for SW0 (bit 0)
+    TST R3, R4
+    BNE increment_by_one    @ If not pressed, increment by 1
 
-write_leds:
-	STR R2, [R1, #0x14]
-	B main_loop
+increment_by_two:
+    ADDS R2, R2, #2         @ SW0 pressed: increment by 2
+    B delay_selection
+
+increment_by_one:
+    ADDS R2, R2, #1         @ SW0 not pressed: increment by 1
+
+delay_selection:
+    @ Determine delay time based on SW1
+    MOVS R4, #0b00000010    @ Mask for SW1 (bit 1)
+    TST R3, R4
+    BNE seven_delay      @ If SW1 not pressed, use long delay(0.7s)
+
+three_delay: @else use short delay(0.3s)
+    LDR R7, SHORT_DELAY_CNT @ Load short delay value (0.3s)
+    B pattern_display
+
+seven_delay:
+    LDR R7, LONG_DELAY_CNT  @ Load long delay value (0.7s)
+
+pattern_display:
+    @ Display the current pattern on LEDs
+    STR R2, [R1, #0x14]     @ Write to GPIOB_ODR
+
+    @ Execute delay loop
+delay_loop:
+    SUBS R7, R7, #1         @ Decrement delay counter
+    BNE delay_loop          @ Loop until counter reaches 0
+
+    @ Loop forever
+    B main_loop
 
 @ LITERALS; DO NOT EDIT
 	.align
