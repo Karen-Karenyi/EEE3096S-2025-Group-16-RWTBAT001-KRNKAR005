@@ -48,17 +48,17 @@ uint32_t end_time = 0;
 uint32_t execution_time = 0;
 uint64_t checksum = 0;
 
-// Updated image dimensions to gradually increase up to Full HD (1920x1080)
-const uint32_t IMAGE_DIMENSIONS[] = {360, 640, 800, 1024, 1280, 1920};
-const uint32_t IMAGE_HEIGHTS[] = {192, 360, 450, 576, 720, 1080};
-const uint32_t NUM_DIMENSIONS = 13;
-uint32_t current_dimension = 0;
-uint32_t width = 0;
-uint32_t height = 0;
+const uint32_t IMAGE_DIMENSIONS[] = {128, 160, 192, 224, 256};
+const uint32_t NUM_DIMENSIONS = 5;
+uint32_t width = IMAGE_DIMENSIONS[0];
+uint32_t height = IMAGE_DIMENSIONS[0];
 
 // Performance measurement variables for live expressions
 uint32_t clock_cycles = 0;
 float throughput = 0.0f;
+
+// Define CPU frequency (48 MHz from your SystemClock_Config)
+const uint32_t CPU_FREQUENCY = 48000000; // 48 MHz
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -67,32 +67,10 @@ static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
 uint64_t calculate_mandelbrot_fixed_point_arithmetic(int width, int height, int max_iterations);
 uint64_t calculate_mandelbrot_double(int width, int height, int max_iterations);
-void start_cycle_count(void);
-uint32_t stop_cycle_count(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-// Simple cycle counting using a global variable and assembly
-volatile uint32_t cycle_count_start = 0;
-
-void start_cycle_count(void) {
-    // Store the current cycle count (using SysTick if available, or approximate)
-    cycle_count_start = SysTick->VAL;
-}
-
-uint32_t stop_cycle_count(void) {
-    // Calculate elapsed cycles based on SysTick reload value
-    uint32_t current_val = SysTick->VAL;
-    uint32_t reload_val = SysTick->LOAD;
-
-    if (current_val <= cycle_count_start) {
-        return cycle_count_start - current_val;
-    } else {
-        return (reload_val - current_val) + cycle_count_start;
-    }
-}
 
 /* USER CODE END 0 */
 
@@ -107,55 +85,48 @@ int main(void)
   MX_GPIO_Init();
 
   /* USER CODE BEGIN 2 */
+  // Visual indicator: LED0 ON (start)
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
-  // Loop through all image dimensions
-  for (current_dimension = 0; current_dimension < NUM_DIMENSIONS; current_dimension++)
-  {
-    width = IMAGE_DIMENSIONS[current_dimension];
-    height = IMAGE_HEIGHTS[current_dimension];
+  // Record start time
+  start_time = HAL_GetTick();
 
-    // Visual indicator: LED0 ON (start)
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+  // === Call Mandelbrot function (choose one) ===
+  checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
+  // OR
+  //checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
 
-    // Record start time and start cycle counting
-    start_time = HAL_GetTick();
-    start_cycle_count();
+  // Record end time
+  end_time = HAL_GetTick();
 
-    // === Call Mandelbrot function (choose one) ===
-    checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
-    // OR
-    //checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
+  // Calculate performance metrics
+  execution_time = end_time - start_time;
 
-    // Record end time and stop cycle counting
-    end_time = HAL_GetTick();
-    clock_cycles = stop_cycle_count();
-
-    // Calculate performance metrics
-    execution_time = end_time - start_time;
-    if (execution_time > 0) {
-        throughput = (float)(width * height) / ((float)execution_time / 1000.0f);
-    } else {
-        throughput = 1.0f / 0.0f; // Create infinity value
-    }
-
-    // Visual indicator: LED1 ON (end)
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
-
-    // Hold LEDs ON for 1 second to indicate completion of this dimension
-    HAL_Delay(1000);
-
-    // Turn off LEDs
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_RESET);
-
-    // Short delay before next dimension
-    HAL_Delay(500);
+  // Handle the case where execution time is 0 (calculation too fast to measure)
+  if (execution_time == 0) {
+      // Use minimum measurable time (1ms) to calculate throughput
+      // This gives a conservative estimate rather than infinity
+      clock_cycles = (uint32_t)(CPU_FREQUENCY * 0.001f); // 1ms worth of cycles
+      throughput = (float)(width * height) * 1000.0f; // pixels per second
+  } else {
+      // Normal calculation
+      clock_cycles = (uint32_t)(CPU_FREQUENCY * (execution_time / 1000.0f));
+      throughput = (float)(width * height) / ((float)execution_time / 1000.0f);
   }
+
+  // Visual indicator: LED1 ON (end)
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
+
+  // Hold LEDs ON for 2 seconds
+  HAL_Delay(2000);
+
+  // Turn off LEDs
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_RESET);
   /* USER CODE END 2 */
 
   while (1)
   {
     // Idle loop - all performance metrics are available in variables for live expressions
-    // The final results will be for the largest dimension (1920x1080)
   }
 }
 
