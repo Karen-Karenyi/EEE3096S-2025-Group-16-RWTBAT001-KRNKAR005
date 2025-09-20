@@ -133,7 +133,7 @@ int main(void)
       start_cycles = DWT->CYCCNT;                          // CPU Cycle Counter
 
       //TODO: Call the Mandelbrot Function and store the output in the checksum variable defined initially
-      checksum = calculate_mandelbrot_float(width, height, MAX_ITER);
+      checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
 
       // Record end time + cycles
       end_time = HAL_GetTick();                             // Wall clock time
