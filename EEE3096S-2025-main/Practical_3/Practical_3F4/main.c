@@ -1,4 +1,3 @@
-
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -63,12 +62,12 @@ uint32_t cycles_taken = 0;    // Total CPU cycles used
 float throughput = 0.0f;     //pixels per second throughput
 
 /* Benchmarking image dimensions */
-//const uint32_t IMAGE_DIMENSIONS[] = {128, 160, 192, 224, 256};
-//const uint32_t NUM_DIMENSIONS = 5;
+const uint32_t IMAGE_DIMENSIONS[] = {128, 160, 192, 224, 256};
+const uint32_t NUM_DIMENSIONS = 5;
 
 /* Current test dimensions (initialized to smallest size) */
-//uint32_t width = IMAGE_DIMENSIONS[4];
-//uint32_t height = IMAGE_DIMENSIONS[4];
+uint32_t width = IMAGE_DIMENSIONS[4];
+uint32_t height = IMAGE_DIMENSIONS[4];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -77,6 +76,7 @@ static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
 uint64_t calculate_mandelbrot_fixed_point_arithmetic(int width, int height, int max_iterations);
 uint64_t calculate_mandelbrot_double(int width, int height, int max_iterations);
+uint64_t calculate_mandelbrot_float(int width, int height, int max_iterations);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -120,20 +120,20 @@ int main(void)
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
   // === Task 4 scalability loop ===
-  const uint32_t TEST_WIDTHS[]  = {360, 640, 800, 1024, 1280, 1920};
-  const uint32_t TEST_HEIGHTS[] = {192, 360, 450,  576,  720, 1080};
-  const uint32_t NUM_TESTS = 6;
+  //const uint32_t TEST_WIDTHS[]  = {360, 640, 800, 1024, 1280, 1920};
+  //const uint32_t TEST_HEIGHTS[] = {192, 360, 450,  576,  720, 1080};
+ // const uint32_t NUM_TESTS = 6;
 
-  for (int i = 0; i < NUM_TESTS; i++) {
-	  uint32_t width  = TEST_WIDTHS[i];
-	  uint32_t height = TEST_HEIGHTS[i];
+  //for (int i = 0; i < NUM_TESTS; i++) {
+	 // uint32_t width  = TEST_WIDTHS[i];
+	  //uint32_t height = TEST_HEIGHTS[i];
 
       // Record start time + cycles
       start_time = HAL_GetTick();                          // Wall clock time
       start_cycles = DWT->CYCCNT;                          // CPU Cycle Counter
 
       //TODO: Call the Mandelbrot Function and store the output in the checksum variable defined initially
-      checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
+      checksum = calculate_mandelbrot_float(width, height, MAX_ITER);
 
       // Record end time + cycles
       end_time = HAL_GetTick();                             // Wall clock time
@@ -149,7 +149,7 @@ int main(void)
 
       // Small pause between tests so Live Expressions can update
       HAL_Delay(1000);
-  }
+  //}
 
   //TODO: Turn on LED 1 to signify the end of the operation
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
@@ -291,6 +291,38 @@ uint64_t calculate_mandelbrot_double(int width, int height, int max_iterations){
   }
   return mandelbrot_sum;
 }
+// Mandelbrot with float
+uint64_t calculate_mandelbrot_float(int width, int height, int max_iterations) {
+    uint64_t mandelbrot_sum = 0;
+    const float escape_threshold = 4.0f * 0.9f;   // same scaled threshold
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            // Map pixel (x, y) to complex plane [-2.5, 1.0] × [-1.0, 1.0]
+            float x0 = (x * 3.5f / (float)width) - 2.5f;
+            float y0 = (y * 2.0f / (float)height) - 1.0f;
+
+            float xi = 0.0f, yi = 0.0f;
+            int iteration = 0;
+
+            while (iteration < max_iterations) {
+                float xi_sq = xi * xi;
+                float yi_sq = yi * yi;
+
+                if (xi_sq + yi_sq > escape_threshold) break;
+
+                float temp = xi_sq - yi_sq + x0;
+                yi = 2.0f * xi * yi + y0;
+                xi = temp;
+
+                iteration++;
+            }
+            mandelbrot_sum += iteration;
+        }
+    }
+    return mandelbrot_sum;
+}
+
 /* USER CODE END 4 */
 
 /**
