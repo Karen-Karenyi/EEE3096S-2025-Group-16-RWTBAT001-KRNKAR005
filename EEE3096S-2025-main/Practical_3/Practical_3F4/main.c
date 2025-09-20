@@ -1,3 +1,4 @@
+
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -62,12 +63,12 @@ uint32_t cycles_taken = 0;    // Total CPU cycles used
 float throughput = 0.0f;     //pixels per second throughput
 
 /* Benchmarking image dimensions */
-const uint32_t IMAGE_DIMENSIONS[] = {128, 160, 192, 224, 256};
-const uint32_t NUM_DIMENSIONS = 5;
+//const uint32_t IMAGE_DIMENSIONS[] = {128, 160, 192, 224, 256};
+//const uint32_t NUM_DIMENSIONS = 5;
 
 /* Current test dimensions (initialized to smallest size) */
-uint32_t width = IMAGE_DIMENSIONS[4];
-uint32_t height = IMAGE_DIMENSIONS[4];
+//uint32_t width = IMAGE_DIMENSIONS[4];
+//uint32_t height = IMAGE_DIMENSIONS[4];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -118,24 +119,37 @@ int main(void)
   //TODO: Turn on LED 0 to signify the start of the operation
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
-  // Record start time + cycles
-  start_time = HAL_GetTick();                          // Wall clock time
-  start_cycles = DWT->CYCCNT;                          // CPU Cycle Counter
+  // === Task 4 scalability loop ===
+  const uint32_t TEST_WIDTHS[]  = {360, 640, 800, 1024, 1280, 1920};
+  const uint32_t TEST_HEIGHTS[] = {192, 360, 450,  576,  720, 1080};
+  const uint32_t NUM_TESTS = 6;
 
-  //TODO: Call the Mandelbrot Function and store the output in the checksum variable defined initially
-  checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
+  for (int i = 0; i < NUM_TESTS; i++) {
+	  uint32_t width  = TEST_WIDTHS[i];
+	  uint32_t height = TEST_HEIGHTS[i];
 
-  // Record end time + cycles
-  end_time = HAL_GetTick();                             // Wall clock time
-  end_cycles = DWT->CYCCNT;                             // CPU Cycle Counter
+      // Record start time + cycles
+      start_time = HAL_GetTick();                          // Wall clock time
+      start_cycles = DWT->CYCCNT;                          // CPU Cycle Counter
 
-  // Calculate execution time + cycles
-  execution_time = end_time - start_time;        // ms
-  cycles_taken = end_cycles - start_cycles;      // cycles
+      //TODO: Call the Mandelbrot Function and store the output in the checksum variable defined initially
+      checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
 
-  // Calculate throughput in pixels/sec
-  uint32_t num_pixels = width * height;
-  throughput = (float)num_pixels / ((float)execution_time / 1000.0f);     // px/s
+      // Record end time + cycles
+      end_time = HAL_GetTick();                             // Wall clock time
+      end_cycles = DWT->CYCCNT;                             // CPU Cycle Counter
+
+      // Calculate execution time + cycles
+      execution_time = end_time - start_time;        // ms
+      cycles_taken = end_cycles - start_cycles;      // cycles
+
+      // Calculate throughput in pixels/sec
+      uint32_t num_pixels = width * height;
+      throughput = (float)num_pixels / ((float)execution_time / 1000.0f);     // px/s
+
+      // Small pause between tests so Live Expressions can update
+      HAL_Delay(1000);
+  }
 
   //TODO: Turn on LED 1 to signify the end of the operation
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
@@ -145,8 +159,8 @@ int main(void)
 
   //TODO: Turn off the LEDs
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_RESET);
-
   /* USER CODE END 2 */
+
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
