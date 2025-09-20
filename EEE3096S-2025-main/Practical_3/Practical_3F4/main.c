@@ -133,7 +133,7 @@ int main(void)
       start_cycles = DWT->CYCCNT;                          // CPU Cycle Counter
 
       //TODO: Call the Mandelbrot Function and store the output in the checksum variable defined initially
-      checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
+      checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
 
       // Record end time + cycles
       end_time = HAL_GetTick();                             // Wall clock time
@@ -234,7 +234,7 @@ static void MX_GPIO_Init(void)
 // Mandelbrot with fixed point arithmetic
 uint64_t calculate_mandelbrot_fixed_point_arithmetic(int width, int height, int max_iterations){
   uint64_t mandelbrot_sum = 0;
-  const int32_t scale = 1000000;
+  const int32_t scale = 100000; // Used 1000, 10000, and 100000
   const int32_t escape_threshold = 4 * scale * 0.9;  // Tuned threshold
 
   for (int y = 0; y < height; y++) {
