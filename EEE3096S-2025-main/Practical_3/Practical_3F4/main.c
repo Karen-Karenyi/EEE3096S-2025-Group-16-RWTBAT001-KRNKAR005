@@ -27,7 +27,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define MAX_ITER 1000
+#define MAX_ITER 100
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -43,17 +43,29 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-// Performance timing and result measurement variables
-uint32_t start_time = 0;
-uint32_t end_time = 0;
-uint32_t execution_time = 0;
-uint64_t checksum = 0;
+//TODO: Define and initialise the global varibales required
+/*
+  start_time
+  end_time
+  execution_time
+  checksum: should be uint64_t
+  initial width and height maybe or you might opt for an array??
+*/
+/* Timing and result measurement variables */
+uint32_t start_time = 0;       // Stores start time stamp (s)
+uint32_t end_time = 0;         // Stores end time stamp (s)
+uint32_t execution_time = 0;   // Calculated duration (s)
+uint64_t checksum = 0;         // Accumulates iteration counts
+uint32_t start_cycles = 0;    //cycle counter start
+uint32_t end_cycles = 0;      //cycle counter end
+uint32_t cycles_taken = 0;    // Total CPU cycles used
+float throughput = 0.0f;     //pixels per second throughput
 
-// Benchmarking image dimensions
+/* Benchmarking image dimensions */
 const uint32_t IMAGE_DIMENSIONS[] = {128, 160, 192, 224, 256};
 const uint32_t NUM_DIMENSIONS = 5;
 
-// Default size
+/* Current test dimensions (initialized to smallest size) */
 uint32_t width = IMAGE_DIMENSIONS[4];
 uint32_t height = IMAGE_DIMENSIONS[4];
 /* USER CODE END PV */
@@ -83,37 +95,55 @@ int main(void)
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
+  /* USER CODE BEGIN Init */
 
+  /* USER CODE END Init */
   /* Configure the system clock */
+
   SystemClock_Config();
 
+  /* USER CODE BEGIN SysInit */
+  /* USER CODE END SysInit */
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
 
   /* USER CODE BEGIN 2 */
-  // Visual indicator: Turn on LED0 to signal processing start
+  // Enable DWT cycle counter
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;           // Enable trace
+  DWT->CYCCNT = 0;                                          // Reset counter
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;                      // Enable cycle counting
+
+  //TODO: Turn on LED 0 to signify the start of the operation
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
-  // Record start time
-  start_time = HAL_GetTick();
+  // Record start time + cycles
+  start_time = HAL_GetTick();                          // Wall clock time
+  start_cycles = DWT->CYCCNT;                          // CPU Cycle Counter
 
-  // Run Mandelbrot calculation
-  checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
+  //TODO: Call the Mandelbrot Function and store the output in the checksum variable defined initially
+  checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
 
-  // Record end time
-  end_time = HAL_GetTick();
+  // Record end time + cycles
+  end_time = HAL_GetTick();                             // Wall clock time
+  end_cycles = DWT->CYCCNT;                             // CPU Cycle Counter
 
-  // Calculate execution time
-  execution_time = end_time - start_time;
+  // Calculate execution time + cycles
+  execution_time = end_time - start_time;        // ms
+  cycles_taken = end_cycles - start_cycles;      // cycles
 
-  // Visual indicator: Turn on LED1 to signal processing end
+  // Calculate throughput in pixels/sec
+  uint32_t num_pixels = width * height;
+  throughput = (float)num_pixels / ((float)execution_time / 1000.0f);     // px/s
+
+  //TODO: Turn on LED 1 to signify the end of the operation
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
 
-  // Keep LEDs ON for 2s
+  //TODO: Hold the LEDs on for a 2s delay
   HAL_Delay(2000);
 
-  // Turn OFF LEDs
+  //TODO: Turn off the LEDs
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_RESET);
 
   /* USER CODE END 2 */
@@ -122,7 +152,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    // Stay idle
+    // Stay idle — values visible in Live Expressions
   }
   /* USER CODE END WHILE */
 }
