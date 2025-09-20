@@ -18,7 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include <math.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -28,7 +27,9 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
 #define MAX_ITER 100
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -48,20 +49,10 @@ uint32_t end_time = 0;
 uint32_t execution_time = 0;
 uint64_t checksum = 0;
 
-// Supported resolutions: {width, height} pairs
-const uint32_t IMAGE_WIDTHS[] = {360, 640, 800, 1024, 1280, 1920};
-const uint32_t IMAGE_HEIGHTS[] = {192, 360, 450, 576, 720, 1080};
-const uint32_t NUM_DIMENSIONS = 6;
-uint32_t current_dimension = 0;
-uint32_t width = 0;
-uint32_t height = 0;
-
-// Performance measurement variables for live expressions
-volatile uint64_t clock_cycles = 0;
-volatile float throughput = 0.0f;
-
-// Define CPU frequency (48 MHz from your SystemClock_Config)
-const uint32_t CPU_FREQUENCY = 48000000; // 48 MHz
+const uint32_t IMAGE_DIMENSIONS[] = {128, 160, 192, 224, 256};
+const uint32_t NUM_DIMENSIONS = 5;
+uint32_t width = IMAGE_DIMENSIONS[0];
+uint32_t height = IMAGE_DIMENSIONS[0];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -70,9 +61,6 @@ static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
 uint64_t calculate_mandelbrot_fixed_point_arithmetic(int width, int height, int max_iterations);
 uint64_t calculate_mandelbrot_double(int width, int height, int max_iterations);
-uint64_t calculate_mandelbrot_streaming(int width, int height, int max_iterations);
-uint8_t calculate_mandelbrot_pixel_double(int x, int y, int width, int height, int max_iterations);
-uint8_t calculate_mandelbrot_pixel_fixed(int x, int y, int width, int height, int max_iterations);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -85,65 +73,40 @@ uint8_t calculate_mandelbrot_pixel_fixed(int x, int y, int width, int height, in
   * @retval int
   */
 int main(void)
-{
+ {
   HAL_Init();
   SystemClock_Config();
   MX_GPIO_Init();
 
   /* USER CODE BEGIN 2 */
+  // Visual indicator: LED0 ON (start)
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
-  // Loop through all image dimensions
-  for (current_dimension = 0; current_dimension < NUM_DIMENSIONS; current_dimension++)
-  {
-    width = IMAGE_WIDTHS[current_dimension];
-    height = IMAGE_HEIGHTS[current_dimension];
+  // Record start time
+  start_time = HAL_GetTick();
 
-    // Visual indicator: LED0 ON (start)
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+  // === Call Mandelbrot function (choose one) ===
+  //checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
+  // OR
+  checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
 
-    // Record start time
-    start_time = HAL_GetTick();
+  // Record end time
+  end_time = HAL_GetTick();
+  execution_time = end_time - start_time;
 
-    //checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
-    // OR
-    //checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
-    // OR (RECOMMENDED for large resolutions)
-    checksum = calculate_mandelbrot_streaming(width, height, MAX_ITER);
+  // Visual indicator: LED1 ON (end)
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
 
-    // Record end time
-    end_time = HAL_GetTick();
+  // Hold LEDs ON for 2 seconds
+  HAL_Delay(2000);
 
-    // Calculate performance metrics
-    execution_time = end_time - start_time;
-
-    // Handle the case where execution time is 0 (calculation too fast to measure)
-    if (execution_time == 0) {
-        // Use minimum measurable time (1ms) to calculate throughput
-        clock_cycles = (uint64_t)(CPU_FREQUENCY * 0.001f); // 1ms worth of cycles
-        throughput = (float)(width * height) * 1000.0f; // pixels per second
-    } else {
-        // Normal calculation
-        clock_cycles = (uint64_t)(CPU_FREQUENCY * (execution_time / 1000.0f));
-        throughput = (float)(width * height) / ((float)execution_time / 1000.0f);
-    }
-
-    // Visual indicator: LED1 ON (end)
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
-
-    // Hold LEDs ON for 1 second to indicate completion of this dimension
-    HAL_Delay(1000);
-
-    // Turn off LEDs
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_RESET);
-
-    // Short delay before next dimension
-    HAL_Delay(500);
-  }
+  // Turn off LEDs
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_RESET);
   /* USER CODE END 2 */
 
   while (1)
   {
-    // Idle loop - all performance metrics are available in variables for live expressions
+    // Idle loop
   }
 }
 
@@ -198,85 +161,61 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-// Memory-efficient streaming implementation
-uint64_t calculate_mandelbrot_streaming(int width, int height, int max_iterations) {
+// Mandelbrot functions (untouched, just brought in)
+uint64_t calculate_mandelbrot_fixed_point_arithmetic(int width, int height, int max_iterations) {
   uint64_t mandelbrot_sum = 0;
+  const int32_t scale = 1000000;
+  const int32_t escape_threshold = 4 * scale * 0.9;
 
-  // Process one pixel at a time - minimal memory usage
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
-      // Choose one pixel calculation method:
-      uint8_t iteration = calculate_mandelbrot_pixel_double(x, y, width, height, max_iterations);
-      // OR for floating-point (much slower):
-      // uint8_t iteration = calculate_mandelbrot_pixel_double(x, y, width, height, max_iterations);
+      int32_t x0 = ((int64_t)x * 35 * scale / width) / 10 - (25 * scale / 10);
+      int32_t y0 = ((int64_t)y * 20 * scale / height) / 10 - (10 * scale / 10);
 
+      int32_t xi = 0, yi = 0;
+      int iteration = 0;
+
+  while (iteration < max_iterations) {
+        int64_t xi_sq = ((int64_t)xi * xi) / scale;
+        int64_t yi_sq = ((int64_t)yi * yi) / scale;
+
+        if (xi_sq + yi_sq > escape_threshold) break;
+
+        int32_t temp = xi_sq - yi_sq + x0;
+        yi = ((int64_t)2 * xi * yi) / scale + y0;
+        xi = temp;
+        iteration++;
+      }
       mandelbrot_sum += iteration;
     }
   }
   return mandelbrot_sum;
 }
 
-// Fixed-point pixel calculation (memory efficient)
-uint8_t calculate_mandelbrot_pixel_fixed(int x, int y, int width, int height, int max_iterations) {
-  const int32_t scale = 1000000;
-  const int32_t escape_threshold = 4 * scale * 0.9;
-
-  int32_t x0 = ((int64_t)x * 35 * scale / width) / 10 - (25 * scale / 10);
-  int32_t y0 = ((int64_t)y * 20 * scale / height) / 10 - (10 * scale / 10);
-
-  int32_t xi = 0, yi = 0;
-  int iteration = 0;
-
-  while (iteration < max_iterations) {
-    int64_t xi_sq = ((int64_t)xi * xi) / scale;
-    int64_t yi_sq = ((int64_t)yi * yi) / scale;
-
-    if (xi_sq + yi_sq > escape_threshold) break;
-
-    int32_t temp = xi_sq - yi_sq + x0;
-    yi = ((int64_t)2 * xi * yi) / scale + y0;
-    xi = temp;
-    iteration++;
-  }
-
-  return iteration;
-}
-
-// Floating-point pixel calculation (slower but available)
-uint8_t calculate_mandelbrot_pixel_double(int x, int y, int width, int height, int max_iterations) {
-  const double escape_threshold = 4.0 * 0.9;
-
-  double x0 = (x * 3.5 / width) - 2.5;
-  double y0 = (y * 2.0 / height) - 1.0;
-
-  double xi = 0.0, yi = 0.0;
-  int iteration = 0;
-
-  while (iteration < max_iterations) {
-    double xi_sq = xi * xi;
-    double yi_sq = yi * yi;
-
-    if (xi_sq + yi_sq > escape_threshold) break;
-
-    double temp = xi_sq - yi_sq + x0;
-    yi = 2.0 * xi * yi + y0;
-    xi = temp;
-    iteration++;
-  }
-
-  return iteration;
-}
-
-// Original functions kept for compatibility
-uint64_t calculate_mandelbrot_fixed_point_arithmetic(int width, int height, int max_iterations) {
-  return calculate_mandelbrot_streaming(width, height, max_iterations);
-}
-
 uint64_t calculate_mandelbrot_double(int width, int height, int max_iterations) {
   uint64_t mandelbrot_sum = 0;
+  const double escape_threshold = 4.0 * 0.9;
+
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
-      mandelbrot_sum += calculate_mandelbrot_pixel_double(x, y, width, height, max_iterations);
+      double x0 = (x * 3.5 / width) - 2.5;
+      double y0 = (y * 2.0 / height) - 1.0;
+
+      double xi = 0.0, yi = 0.0;
+      int iteration = 0;
+
+      while (iteration < max_iterations) {
+        double xi_sq = xi * xi;
+        double yi_sq = yi * yi;
+
+        if (xi_sq + yi_sq > escape_threshold) break;
+
+        double temp = xi_sq - yi_sq + x0;
+        yi = 2.0 * xi * yi + y0;
+        xi = temp;
+        iteration++;
+      }
+      mandelbrot_sum += iteration;
     }
   }
   return mandelbrot_sum;
