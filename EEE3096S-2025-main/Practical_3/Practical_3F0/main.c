@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include <math.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -27,9 +28,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
-#define MAX_ITER 1000 //manually changed this value (100, 250, 500, 750 and 1000)
-
+#define MAX_ITER 100
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -53,6 +52,13 @@ const uint32_t IMAGE_DIMENSIONS[] = {128, 160, 192, 224, 256};
 const uint32_t NUM_DIMENSIONS = 5;
 uint32_t width = IMAGE_DIMENSIONS[0];
 uint32_t height = IMAGE_DIMENSIONS[0];
+
+// Performance measurement variables for live expressions
+uint32_t clock_cycles = 0;
+float throughput = 0.0f;
+
+// Define CPU frequency (48 MHz from your SystemClock_Config)
+const uint32_t CPU_FREQUENCY = 48000000; // 48 MHz
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,7 +79,7 @@ uint64_t calculate_mandelbrot_double(int width, int height, int max_iterations);
   * @retval int
   */
 int main(void)
- {
+{
   HAL_Init();
   SystemClock_Config();
   MX_GPIO_Init();
@@ -88,11 +94,25 @@ int main(void)
   // === Call Mandelbrot function (choose one) ===
   checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
   // OR
-  // checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
+  //checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
 
   // Record end time
   end_time = HAL_GetTick();
+
+  // Calculate performance metrics
   execution_time = end_time - start_time;
+
+  // Handle the case where execution time is 0 (calculation too fast to measure)
+  if (execution_time == 0) {
+      // Use minimum measurable time (1ms) to calculate throughput
+      // This gives a conservative estimate rather than infinity
+      clock_cycles = (uint32_t)(CPU_FREQUENCY * 0.001f); // 1ms worth of cycles
+      throughput = (float)(width * height) * 1000.0f; // pixels per second
+  } else {
+      // Normal calculation
+      clock_cycles = (uint32_t)(CPU_FREQUENCY * (execution_time / 1000.0f));
+      throughput = (float)(width * height) / ((float)execution_time / 1000.0f);
+  }
 
   // Visual indicator: LED1 ON (end)
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
@@ -106,7 +126,7 @@ int main(void)
 
   while (1)
   {
-    // Idle loop
+    // Idle loop - all performance metrics are available in variables for live expressions
   }
 }
 
