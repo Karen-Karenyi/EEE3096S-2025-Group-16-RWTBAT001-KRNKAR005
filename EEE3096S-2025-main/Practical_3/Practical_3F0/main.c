@@ -51,8 +51,8 @@ uint64_t checksum = 0;
 
 const uint32_t IMAGE_DIMENSIONS[] = {128, 160, 192, 224, 256};
 const uint32_t NUM_DIMENSIONS = 5;
-uint32_t width = IMAGE_DIMENSIONS[0];
-uint32_t height = IMAGE_DIMENSIONS[0];
+uint32_t width = IMAGE_DIMENSIONS[3];
+uint32_t height = IMAGE_DIMENSIONS[3];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -86,9 +86,9 @@ int main(void)
   start_time = HAL_GetTick();
 
   // === Call Mandelbrot function (choose one) ===
-  //checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);
+  checksum = calculate_mandelbrot_fixed_point_arithmetic(width, height, MAX_ITER);//For task 7 we are only using fixed point
   // OR
-  checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
+  //checksum = calculate_mandelbrot_double(width, height, MAX_ITER);
 
   // Record end time
   end_time = HAL_GetTick();
@@ -164,7 +164,7 @@ static void MX_GPIO_Init(void)
 // Mandelbrot functions (untouched, just brought in)
 uint64_t calculate_mandelbrot_fixed_point_arithmetic(int width, int height, int max_iterations) {
   uint64_t mandelbrot_sum = 0;
-  const int32_t scale = 1000000;
+  const int32_t scale = 100000; //Manually changing the scale from 1000->10000->100000
   const int32_t escape_threshold = 4 * scale * 0.9;
 
   for (int y = 0; y < height; y++) {
