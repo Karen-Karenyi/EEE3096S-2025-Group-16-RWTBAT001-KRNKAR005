@@ -35,7 +35,7 @@
 /* USER CODE BEGIN PD */
 // TODO: Add values for below variables
 #define NS      128      // Number of samples in LUT
-#define TIM2CLK  84000000 // STM Clock frequency: Hint You might want to check the ioc file
+#define TIM2CLK  16000000 // STM Clock frequency: Hint You might want to check the ioc file
 #define F_SIGNAL 1000     // Frequency of output analog signal
 
 /* USER CODE END PD */
