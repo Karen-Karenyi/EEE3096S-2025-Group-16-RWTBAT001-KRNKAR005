@@ -39,7 +39,10 @@
 #define F_SIGNAL 1000     // Frequency of output analog signal
 
 /* USER CODE END PD */
-
+uint32_t last_button_time = 0;
+#define DEBOUNCE_DELAY 200 // milliseconds
+uint8_t waveform_index = 0;                         // Current waveform index (0-5)
+const char* waveform_names[] = {"Sine", "Sawtooth", "Triangle", "Piano", "Guitar", "Drum"};
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
@@ -86,6 +89,7 @@ uint32_t Drum_LUT[128] = {
     3428, 2476, 2095, 2667, 3047, 4095, 4000, 1809, 952, 1048, 286, 0, 381, 952, 2190, 1714
 };
 
+uint32_t* current_lut = Sin_LUT;                    // Pointer to current LUT
 
 // TODO: Equation to calculate TIM2_Ticks
 uint32_t TIM2_Ticks = TIM2CLK / (NS * F_SIGNAL); // How often to write new LUT value
@@ -426,13 +430,48 @@ static void MX_GPIO_Init(void)
 void EXTI0_IRQHandler(void){
 
 	// TODO: Debounce using HAL_GetTick()
+  uint32_t currentTime = HAL_GetTick();
+  if ((currentTime - last_button_time) > DEBOUNCE_DELAY)
+    {
+        last_button_time = currentTime;
+	    // TODO: Disable DMA transfer and abort IT, then start DMA in IT mode with new LUT and re-enable transfer
+      __HAL_TIM_DISABLE_DMA(&htim2, TIM_DMA_CC1);
+      HAL_DMA_Abort_IT(&hdma_tim2_ch1);
+      waveform_index = (waveform_index + 1) % 6;  // 6 waveforms total
+              // Switch to the appropriate LUT
+        switch(waveform_index)
+        {
+            case 0:
+                current_lut = Sin_LUT;
+                break;
+            case 1:
+                current_lut = Saw_LUT;
+                break;
+            case 2:
+                current_lut = Triangle_LUT;
+                break;
+            case 3:
+                current_lut = Piano_LUT;
+                break;
+            case 4:
+                current_lut = Guitar_LUT;
+                break;
+            case 5:
+                current_lut = Drum_LUT;
+                break;
+            default:
+                current_lut = Sin_LUT;
+                waveform_index = 0;
+                break;
+        }
+	  HAL_DMA_Start_IT(&hdma_tim2_ch1, (uint32_t)current_lut, DestAddress, NS); //Restart DMA with new LUT
+    
+    //Update LCD with current waveform name
+    lcd_command(CLEAR);
+    lcd_putstring((char*)waveform_names[waveform_index]);
 
-
-	// TODO: Disable DMA transfer and abort IT, then start DMA in IT mode with new LUT and re-enable transfer
-	// HINT: Consider using C's "switch" function to handle LUT changes
-
-
-
+    __HAL_TIM_ENABLE_DMA(&htim2, TIM_DMA_CC1);// Re-enable DMA transfer
+    }
 
 	HAL_GPIO_EXTI_IRQHandler(Button0_Pin); // Clear interrupt flags
 }
